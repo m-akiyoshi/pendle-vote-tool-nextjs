@@ -18,8 +18,6 @@ dotenv.config();
 
 const VOTING_CONTRACT =
   process.env.VOTING_CONTRACT || "0x44087E105137a5095c008AaB6a6530182821F2F0";
-const MY_ADDRESS =
-  process.env.MY_ADDRESS || "0x16ad4e68c2e1d312c01098d3e1cfc633b90dff46";
 const ETHERSCAN_BASE_URL = process.env.ETHERSCAN_BASE_URL;
 
 const provider = new ethers.AlchemyProvider(
@@ -131,8 +129,6 @@ export async function copyTransaction({
     address,
   });
 
-  console.log("myPreviousPools", myPreviousPools);
-
   if ("error" in myPreviousPools) {
     return {
       error: "Failed to fetch your previous vote data. Cannot combine votes.",
@@ -143,13 +139,9 @@ export async function copyTransaction({
     (pool: Vote) => pool.weight !== "0"
   );
 
-  console.log("myNonZeroPreviousPools", myNonZeroPreviousPools);
-
   const targetNonZeroPools = voteData.filter(
     (pool: Vote) => pool.weight !== "0"
   );
-
-  console.log("targetNonZeroPools", targetNonZeroPools);
 
   const finalVoteMap: { [address: string]: bigint } = {};
 
@@ -166,33 +158,6 @@ export async function copyTransaction({
   const finalAddressPools = Object.keys(finalVoteMap);
   const finalWeights = Object.values(finalVoteMap);
 
-  const contract = new ethers.Contract(
-    "0x44087E105137a5095c008AaB6a6530182821F2F0",
-    PendleVotingABI,
-    provider
-  );
-  // try {
-  //   await contract.vote(finalAddressPools, finalWeights, {
-  //     callStatic: true,
-  //     from: "0xf003c7540eB55057e95Bad50D7d8c55d327dc571",
-  //   });
-  //   console.log("✅ vote would succeed");
-  // } catch (err: any) {
-  //   console.error("❌ vote failed:", err);
-
-  //   // Optional: raw revert data for deep decoding
-  //   if (err.data) {
-  //     try {
-  //       const parsed = contract.interface.parseError(err.data);
-  //       console.error("🔍 Decoded custom error:", parsed.name, parsed.args);
-  //     } catch (e) {
-  //       console.error("❓ Unknown revert reason");
-  //     }
-  //   } else {
-  //     console.error("No revert data found");
-  //   }
-  // }
-
   const iface = new ethers.Interface(PendleVotingABI);
   return iface.encodeFunctionData("vote", [finalAddressPools, finalWeights]);
 }
@@ -207,6 +172,7 @@ export async function getVoteTransaction({
   const provider = new ethers.AlchemyProvider("mainnet", alchemyApiKey);
 
   const tx = await provider.getTransaction(txHash);
+  console.log("tx", tx);
   if (!tx) return;
   const decodedVotes = await decodeVote(tx.data);
   return decodedVotes;

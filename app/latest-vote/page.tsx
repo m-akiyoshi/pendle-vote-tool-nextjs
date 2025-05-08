@@ -1,5 +1,6 @@
 "use client";
 import LoadingIcon from "@/components/Loading";
+import { ethers } from "ethers";
 import { LinkIcon } from "lucide-react";
 import { useState } from "react";
 
@@ -10,12 +11,50 @@ interface Vote {
   weight: string;
 }
 
+const VOTING_CONTRACT_ADDRESS = "0x44087E105137a5095c008AaB6a6530182821F2F0";
+
 export default function GetLastTXFromAddress() {
   const [address, setAddress] = useState("");
   const [loading, setLoading] = useState(false);
   const [votes, setVotes] = useState<Vote[]>([]);
   const [txHash, setTxHash] = useState("");
   const [error, setError] = useState("");
+
+  const [signer, setSigner] = useState<ethers.Signer | null>(null);
+  const [connectedAddress, setConnectedAddress] = useState<string | null>(null);
+  const [sentTxHash, setSentTxHash] = useState<string | null>(null);
+  const [isSendingTx, setIsSendingTx] = useState(false);
+
+  const connectWallet = async () => {
+    setError("");
+    setSigner(null);
+    setConnectedAddress(null);
+    if (typeof (window as any).ethereum !== "undefined") {
+      try {
+        await (window as any).ethereum.request({
+          method: "eth_requestAccounts",
+        });
+        const provider = new ethers.BrowserProvider((window as any).ethereum);
+
+        const network = await provider.getNetwork();
+        if (network.chainId !== BigInt(1)) {
+          setError("Please switch to Ethereum Mainnet in your wallet.");
+          return;
+        }
+
+        const walletSigner = await provider.getSigner();
+        setSigner(walletSigner);
+        setConnectedAddress(await walletSigner.getAddress());
+      } catch (e) {
+        console.error("Wallet connection error:", e);
+        setError(e instanceof Error ? e.message : "Failed to connect wallet.");
+        setSigner(null);
+        setConnectedAddress(null);
+      }
+    } else {
+      setError("MetaMask is not installed. Please install it to continue.");
+    }
+  };
 
   const handleSubmit = async () => {
     if (!address) {
@@ -44,10 +83,99 @@ export default function GetLastTXFromAddress() {
     }
   };
 
+  const handleCopy = async () => {
+    if (!signer) {
+      setError("Please connect your wallet first.");
+      return;
+    }
+
+    try {
+      const network = await signer.provider?.getNetwork();
+      if (network?.chainId !== BigInt(1)) {
+        setError(
+          "Please switch to Ethereum Mainnet in your wallet to send the transaction."
+        );
+        setIsSendingTx(false);
+        return;
+      }
+    } catch (e) {
+      console.error("Error getting network information:", e);
+      setError(
+        "Could not verify network. Please ensure your wallet is connected to Ethereum Mainnet."
+      );
+      setIsSendingTx(false);
+      return;
+    }
+
+    if (!txHash) {
+      setError(
+        "You need to have fetched a transaction hash to copy its vote data."
+      );
+      return;
+    }
+
+    setIsSendingTx(true);
+    setError("");
+    setSentTxHash(null);
+    try {
+      const response = await fetch("/api/copy-vote", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ hash: txHash, address: connectedAddress }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Failed to get encoded vote data from API."
+        );
+      }
+
+      if (!data.encodedData) {
+        throw new Error("API did not return encodedData.");
+      }
+
+      const transactionParameters = {
+        to: VOTING_CONTRACT_ADDRESS,
+        data: data.encodedData,
+      };
+
+      const txResponse = await signer.sendTransaction(transactionParameters);
+      setSentTxHash(txResponse.hash);
+      console.log("Transaction sent, hash:", txResponse.hash);
+      await txResponse.wait();
+      console.log("Transaction mined");
+    } catch (e) {
+      console.error("Failed to copy and send vote transaction:", e);
+      setError(
+        e instanceof Error ? e.message : "Failed to send vote transaction."
+      );
+      setSentTxHash(null);
+    } finally {
+      setIsSendingTx(false);
+    }
+  };
+
   return (
     <div className="flex flex-col items-center space-y-6 py-16">
       <div className="flex flex-col gap-6 items-center text-center mx-auto">
         <h2 className="text-2xl font-bold">Get last vote info from address</h2>
+        {!connectedAddress ? (
+          <button
+            onClick={connectWallet}
+            className="px-6 py-3 bg-blue-300 text-white font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+          >
+            Connect Wallet
+          </button>
+        ) : (
+          <div className="text-gray-800 p-2 bg-gray-200 border border-green-300 rounded-md">
+            Connected: {connectedAddress.substring(0, 6)}...
+            {connectedAddress.substring(connectedAddress.length - 4)}
+          </div>
+        )}
         <div className="flex flex-col gap-4">
           <input
             type="text"
@@ -73,12 +201,18 @@ export default function GetLastTXFromAddress() {
             </button>
             {votes.length > 0 && (
               <button
-                className="px-6 py-3 bg-gray-700 text-white font-medium disabled:bg-opacity-50 cursor-pointer rounded-lg disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md w-full"
-                onClick={() => {
-                  navigator.clipboard.writeText(JSON.stringify(votes));
-                }}
+                className="px-6 py-3 bg-blue-700 text-white font-medium disabled:bg-opacity-50 cursor-pointer rounded-lg disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:bg-opacity-60 hover:shadow-md w-full"
+                onClick={handleCopy}
+                disabled={isSendingTx || !txHash || !signer}
               >
-                Copy vote tx
+                {isSendingTx ? (
+                  <span className="flex items-center gap-2">
+                    <LoadingIcon />
+                    Sending Tx...
+                  </span>
+                ) : (
+                  "Copy & Send Vote Tx"
+                )}
               </button>
             )}
           </div>
@@ -106,10 +240,19 @@ export default function GetLastTXFromAddress() {
         </div>
       )}
 
-      {loading && !error && (
+      {loading && !error && !isSendingTx && (
         <div className="text-center py-12">
           <div className="inline-block w-12 h-12 border-4 border-gray-200 border-t-green-500 rounded-full animate-spin"></div>
           <p className="mt-4 text-gray-600">Loading vote information...</p>
+        </div>
+      )}
+
+      {isSendingTx && (
+        <div className="text-center py-12">
+          <div className="inline-block w-12 h-12 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin"></div>
+          <p className="mt-4 text-gray-600">
+            Sending transaction, please check your wallet...
+          </p>
         </div>
       )}
 
@@ -127,6 +270,29 @@ export default function GetLastTXFromAddress() {
           <a href={`https://etherscan.io/tx/${txHash}`} target="_blank">
             <LinkIcon className="w-6 h-6" />
           </a>
+        </div>
+      )}
+
+      {sentTxHash && (
+        <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
+          <div className="flex items-center gap-2">
+            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <span>Transaction successfully sent! Hash: </span>
+            <a
+              href={`https://etherscan.io/tx/${sentTxHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono underline hover:text-green-900"
+            >
+              {sentTxHash.substring(0, 10)}...
+            </a>
+          </div>
         </div>
       )}
 

@@ -5,12 +5,14 @@ import dotenv from "dotenv";
 import { ethers, Interface } from "ethers";
 import process from "process";
 
-export type VoteData = {
+interface Vote {
   address: string;
   name: string;
   expiry: string;
   weight: string;
-}[];
+}
+
+export type VoteData = Vote[];
 
 dotenv.config();
 
@@ -105,48 +107,92 @@ export async function fetchLastVotedPools({
   return { error: "No vote transaction found" };
 }
 
-export async function copyTransaction(hash: string) {
+export async function copyTransaction({
+  hash,
+  address,
+}: {
+  hash: string;
+  address: string;
+}) {
   const voteData = await getVoteTransaction({
     alchemyApiKey: process.env.ALCHEMY_API_KEY || "",
     txHash: hash,
   });
 
+  if (!voteData) {
+    return {
+      error: `Could not retrieve or decode vote data for target transaction hash: ${hash}`,
+    };
+  }
+
   const myPreviousPools = await fetchLastVotedPools({
     etherScanApiKey: process.env.ETHERSCAN_API_KEY || "",
     alchemyApiKey: process.env.ALCHEMY_API_KEY || "",
-    address: MY_ADDRESS,
+    address,
   });
 
   console.log("myPreviousPools", myPreviousPools);
 
   if ("error" in myPreviousPools) {
-    return { error: "No vote transaction found" };
+    return {
+      error: "Failed to fetch your previous vote data. Cannot combine votes.",
+    };
   }
 
   const myNonZeroPreviousPools = myPreviousPools.decoded.filter(
-    (pool: any) => pool.weight !== "0"
+    (pool: Vote) => pool.weight !== "0"
   );
 
   console.log("myNonZeroPreviousPools", myNonZeroPreviousPools);
 
-  const targetNonZeroPools = voteData.decoded.filter(
-    (pool: any) => pool.weight !== "0"
+  const targetNonZeroPools = voteData.filter(
+    (pool: Vote) => pool.weight !== "0"
   );
 
   console.log("targetNonZeroPools", targetNonZeroPools);
 
-  const finalAddressPools = [
-    ...myNonZeroPreviousPools.map((pool: any) => pool.address),
-    ...targetNonZeroPools.map((pool: any) => pool.address),
-  ];
+  const finalVoteMap: { [address: string]: bigint } = {};
 
-  console.log("finalAddressPools", finalAddressPools);
-  const finalWeights = [
-    ...myNonZeroPreviousPools.map((pool: any) => BigNumber.from(pool.weight)),
-    ...targetNonZeroPools.map((pool: any) => BigNumber.from(pool.weight)),
-  ];
+  for (const pool of myNonZeroPreviousPools) {
+    finalVoteMap[pool.address.toLowerCase()] = BigNumber.from(0).toBigInt();
+  }
 
-  console.log("finalWeights", finalWeights);
+  for (const pool of targetNonZeroPools) {
+    finalVoteMap[pool.address.toLowerCase()] = BigNumber.from(
+      pool.weight
+    ).toBigInt();
+  }
+
+  const finalAddressPools = Object.keys(finalVoteMap);
+  const finalWeights = Object.values(finalVoteMap);
+
+  const contract = new ethers.Contract(
+    "0x44087E105137a5095c008AaB6a6530182821F2F0",
+    PendleVotingABI,
+    provider
+  );
+  // try {
+  //   await contract.vote(finalAddressPools, finalWeights, {
+  //     callStatic: true,
+  //     from: "0xf003c7540eB55057e95Bad50D7d8c55d327dc571",
+  //   });
+  //   console.log("✅ vote would succeed");
+  // } catch (err: any) {
+  //   console.error("❌ vote failed:", err);
+
+  //   // Optional: raw revert data for deep decoding
+  //   if (err.data) {
+  //     try {
+  //       const parsed = contract.interface.parseError(err.data);
+  //       console.error("🔍 Decoded custom error:", parsed.name, parsed.args);
+  //     } catch (e) {
+  //       console.error("❓ Unknown revert reason");
+  //     }
+  //   } else {
+  //     console.error("No revert data found");
+  //   }
+  // }
+
   const iface = new ethers.Interface(PendleVotingABI);
   return iface.encodeFunctionData("vote", [finalAddressPools, finalWeights]);
 }

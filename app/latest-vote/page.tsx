@@ -45,8 +45,8 @@ export default function GetLastTXFromAddress() {
   };
 
   return (
-    <div className="space-y-6 py-16">
-      <div className="flex flex-col gap-6 items-center">
+    <div className="flex flex-col items-center space-y-6 py-16">
+      <div className="flex flex-col gap-6 items-center text-center mx-auto">
         <h2 className="text-2xl font-bold">Get last vote info from address</h2>
         <div className="flex flex-col gap-4">
           <input
@@ -115,7 +115,7 @@ export default function GetLastTXFromAddress() {
 
       {txHash && (
         <div className="flex items-center gap-2">
-          <p className="">Transaction hash: </p>
+          <p className="font-semibold">Transaction hash: </p>
           <p
             onClick={() => {
               navigator.clipboard.writeText(txHash);

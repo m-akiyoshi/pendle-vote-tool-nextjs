@@ -14,10 +14,11 @@ export type VoteData = {
 
 dotenv.config();
 
-const VOTING_CONTRACT = "0x44087E105137a5095c008AaB6a6530182821F2F0";
-const TARGET_ADDRESS = "0x59aad2C81b86df6E4A0Dae51c5C5bd45Ba451875";
-const MY_ADDRESS = "0x16ad4e68c2e1d312c01098d3e1cfc633b90dff46";
-const ETHERSCAN_BASE_URL = "https://api.etherscan.io/v2/api";
+const VOTING_CONTRACT =
+  process.env.VOTING_CONTRACT || "0x44087E105137a5095c008AaB6a6530182821F2F0";
+const MY_ADDRESS =
+  process.env.MY_ADDRESS || "0x16ad4e68c2e1d312c01098d3e1cfc633b90dff46";
+const ETHERSCAN_BASE_URL = process.env.ETHERSCAN_BASE_URL;
 
 const provider = new ethers.AlchemyProvider(
   "mainnet",

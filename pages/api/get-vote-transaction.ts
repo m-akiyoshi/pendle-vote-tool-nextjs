@@ -1,13 +1,6 @@
 import { getVoteTransaction } from "@/lib/voteListener";
 import { NextApiRequest, NextApiResponse } from "next";
 
-type VoteData = {
-  address: string;
-  name: string;
-  expiry: string;
-  weight: string;
-}[];
-
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse

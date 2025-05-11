@@ -1,7 +1,8 @@
 "use client";
 
 import LoadingIcon from "@/components/Loading";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 interface Vote {
   name: string;
@@ -11,14 +12,14 @@ interface Vote {
 }
 
 export default function VoteInfo() {
-  // Consider renaming to GetTxInfoPage or similar
+  const searchParams = useSearchParams();
   const [txHash, setTxHash] = useState("");
   const [loading, setLoading] = useState(false);
   const [votes, setVotes] = useState<Vote[]>([]);
   const [error, setError] = useState("");
 
-  const handleSubmit = async () => {
-    if (!txHash) {
+  const handleSubmit = async (hash: string = txHash) => {
+    if (!hash) {
       setError("Please enter a transaction hash");
       return;
     }
@@ -26,9 +27,7 @@ export default function VoteInfo() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(
-        `/api/get-vote-transaction?txHash=${txHash}`
-      );
+      const response = await fetch(`/api/get-vote-transaction?txHash=${hash}`);
       if (!response.ok) {
         throw new Error("Failed to fetch vote info");
       }
@@ -43,6 +42,15 @@ export default function VoteInfo() {
     }
   };
 
+  useEffect(() => {
+    if (!searchParams) return;
+    const hash = searchParams.get("txHash");
+    if (hash) {
+      setTxHash(hash);
+      handleSubmit(hash);
+    }
+  }, [searchParams]);
+
   return (
     <div className="space-y-6 py-16 px-16">
       <div className="flex flex-col gap-4 items-center">
@@ -55,7 +63,7 @@ export default function VoteInfo() {
           className="px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
         />
         <button
-          onClick={handleSubmit}
+          onClick={() => handleSubmit()}
           disabled={loading || !txHash}
           className="px-6 py-3 bg-blue-500 text-white font-medium disabled:bg-opacity-50 cursor-pointer rounded-lg disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md"
         >

@@ -172,7 +172,6 @@ export async function getVoteTransaction({
   const provider = new ethers.AlchemyProvider("mainnet", alchemyApiKey);
 
   const tx = await provider.getTransaction(txHash);
-  console.log("tx", tx);
   if (!tx) return;
   const decodedVotes = await decodeVote(tx.data);
   return decodedVotes;

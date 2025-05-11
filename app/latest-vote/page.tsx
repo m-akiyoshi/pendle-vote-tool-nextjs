@@ -2,7 +2,8 @@
 import LoadingIcon from "@/components/Loading";
 import { ethers } from "ethers";
 import { LinkIcon } from "lucide-react";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 interface Vote {
   name: string;
@@ -14,6 +15,8 @@ interface Vote {
 const VOTING_CONTRACT_ADDRESS = "0x44087E105137a5095c008AaB6a6530182821F2F0";
 
 export default function GetLastTXFromAddress() {
+  const searchParams = useSearchParams();
+
   const [address, setAddress] = useState("");
   const [loading, setLoading] = useState(false);
   const [votes, setVotes] = useState<Vote[]>([]);
@@ -24,6 +27,16 @@ export default function GetLastTXFromAddress() {
   const [connectedAddress, setConnectedAddress] = useState<string | null>(null);
   const [sentTxHash, setSentTxHash] = useState<string | null>(null);
   const [isSendingTx, setIsSendingTx] = useState(false);
+
+  useEffect(() => {
+    console.log("searchParams", searchParams);
+    if (!searchParams) return;
+    const hash = searchParams.get("txHash");
+    if (hash) {
+      setTxHash(hash);
+      handleSubmitHash(hash);
+    }
+  }, [searchParams]);
 
   const connectWallet = async () => {
     setError("");
@@ -74,6 +87,30 @@ export default function GetLastTXFromAddress() {
       const data = await response.json();
       setVotes(data.decoded);
       setTxHash(data.hash);
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : "Failed to fetch vote info"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmitHash = async (hash: string = txHash) => {
+    if (!hash) {
+      setError("Please enter a transaction hash");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/get-vote-transaction?txHash=${hash}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch vote info");
+      }
+      const data = await response.json();
+      setVotes(data);
     } catch (error) {
       setError(
         error instanceof Error ? error.message : "Failed to fetch vote info"
@@ -201,7 +238,7 @@ export default function GetLastTXFromAddress() {
             </button>
             {votes.length > 0 && (
               <button
-                className="px-6 py-3 bg-blue-700 text-white font-medium disabled:bg-opacity-50 cursor-pointer rounded-lg disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:bg-opacity-60 hover:shadow-md w-full"
+                className="px-6 py-3 bg-blue-700 text-white font-medium disabled:bg-gray-600 cursor-pointer rounded-lg disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:bg-opacity-60 hover:shadow-md w-full"
                 onClick={handleCopy}
                 disabled={isSendingTx || !txHash || !signer}
               >
@@ -210,8 +247,10 @@ export default function GetLastTXFromAddress() {
                     <LoadingIcon />
                     Sending Tx...
                   </span>
-                ) : (
+                ) : signer ? (
                   "Copy & Send Vote Tx"
+                ) : (
+                  "Connect Wallet to copy transaction"
                 )}
               </button>
             )}

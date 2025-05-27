@@ -29,7 +29,6 @@ export default function GetLastTXFromAddress() {
   const [isSendingTx, setIsSendingTx] = useState(false);
 
   useEffect(() => {
-    console.log("searchParams", searchParams);
     if (!searchParams) return;
     const hash = searchParams.get("txHash");
     if (hash) {
@@ -195,6 +194,8 @@ export default function GetLastTXFromAddress() {
       setIsSendingTx(false);
     }
   };
+
+  console.log("loaded");
 
   return (
     <div className="flex flex-col items-center space-y-6 py-16 bg-background text-foreground">

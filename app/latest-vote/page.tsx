@@ -3,7 +3,7 @@ import LoadingIcon from "@/components/Loading";
 import { ethers } from "ethers";
 import { LinkIcon } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react"; // Import Suspense
 
 interface Vote {
   name: string;
@@ -14,7 +14,8 @@ interface Vote {
 
 const VOTING_CONTRACT_ADDRESS = "0x44087E105137a5095c008AaB6a6530182821F2F0";
 
-export default function GetLastTXFromAddress() {
+// Renamed component containing the original logic
+function LatestVoteClientContent() {
   const searchParams = useSearchParams();
 
   const [address, setAddress] = useState("");
@@ -28,15 +29,41 @@ export default function GetLastTXFromAddress() {
   const [sentTxHash, setSentTxHash] = useState<string | null>(null);
   const [isSendingTx, setIsSendingTx] = useState(false);
 
-  useEffect(() => {
-    console.log("searchParams", searchParams);
-    if (!searchParams) return;
-    const hash = searchParams.get("txHash");
-    if (hash) {
-      setTxHash(hash);
-      handleSubmitHash(hash);
+  // handleSubmitHash needs to be defined before being used in useEffect
+  const handleSubmitHash = async (hash: string = txHash) => {
+    if (!hash) {
+      setError("Please enter a transaction hash");
+      return;
     }
-  }, [searchParams]);
+
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/get-vote-transaction?txHash=${hash}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch vote info");
+      }
+      const data = await response.json();
+      setVotes(data);
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : "Failed to fetch vote info"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // console.log("searchParams in LatestVoteClientContent", searchParams); // Keep for debugging if needed
+    if (!searchParams) return;
+    const hashFromParams = searchParams.get("txHash");
+    if (hashFromParams) {
+      setTxHash(hashFromParams);
+      handleSubmitHash(hashFromParams); // Call the locally defined handleSubmitHash
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]); // Add handleSubmitHash to deps if it's not stable and defined outside. If defined inside, it's fine.
 
   const connectWallet = async () => {
     setError("");
@@ -87,30 +114,6 @@ export default function GetLastTXFromAddress() {
       const data = await response.json();
       setVotes(data.decoded);
       setTxHash(data.hash);
-    } catch (error) {
-      setError(
-        error instanceof Error ? error.message : "Failed to fetch vote info"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSubmitHash = async (hash: string = txHash) => {
-    if (!hash) {
-      setError("Please enter a transaction hash");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-    try {
-      const response = await fetch(`/api/get-vote-transaction?txHash=${hash}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch vote info");
-      }
-      const data = await response.json();
-      setVotes(data);
     } catch (error) {
       setError(
         error instanceof Error ? error.message : "Failed to fetch vote info"
@@ -182,9 +185,9 @@ export default function GetLastTXFromAddress() {
 
       const txResponse = await signer.sendTransaction(transactionParameters);
       setSentTxHash(txResponse.hash);
-      console.log("Transaction sent, hash:", txResponse.hash);
+      // console.log("Transaction sent, hash:", txResponse.hash); // Keep for debugging
       await txResponse.wait();
-      console.log("Transaction mined");
+      // console.log("Transaction mined"); // Keep for debugging
     } catch (e) {
       console.error("Failed to copy and send vote transaction:", e);
       setError(
@@ -385,5 +388,18 @@ export default function GetLastTXFromAddress() {
         </div>
       )}
     </div>
+  );
+}
+
+// New default export for the page
+export default function LatestVotePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center items-center min-h-screen bg-background text-foreground">
+        Loading page content...
+      </div>
+    }>
+      <LatestVoteClientContent />
+    </Suspense>
   );
 }

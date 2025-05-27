@@ -197,18 +197,18 @@ export default function GetLastTXFromAddress() {
   };
 
   return (
-    <div className="flex flex-col items-center space-y-6 py-16">
+    <div className="flex flex-col items-center space-y-6 py-16 bg-background text-foreground">
       <div className="flex flex-col gap-6 items-center text-center mx-auto">
         <h2 className="text-2xl font-bold">Get last vote info from address</h2>
         {!connectedAddress ? (
           <button
             onClick={connectWallet}
-            className="px-6 py-3 bg-blue-300 text-white font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+            className="px-6 py-3 bg-white text-black hover:bg-gray-200 rounded-md font-medium transition-all duration-200"
           >
             Connect Wallet
           </button>
         ) : (
-          <div className="text-gray-800 p-2 bg-gray-200 border border-green-300 rounded-md">
+          <div className="text-gray-300 bg-gray-800 border border-gray-700 p-2 rounded-md">
             Connected: {connectedAddress.substring(0, 6)}...
             {connectedAddress.substring(connectedAddress.length - 4)}
           </div>
@@ -219,16 +219,16 @@ export default function GetLastTXFromAddress() {
             placeholder="Enter wallet address"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
+            className="w-full px-4 py-3 rounded-md bg-gray-800 text-gray-300 border border-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-all duration-200"
           />
           <div className="flex gap-2">
             <button
               onClick={handleSubmit}
               disabled={loading || !address}
-              className="px-6 py-3 bg-blue-500 text-white font-medium disabled:bg-opacity-50 cursor-pointer rounded-lg disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md w-full"
+              className="px-6 py-3 bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600 font-medium rounded-md disabled:bg-gray-800 disabled:text-gray-500 disabled:border-gray-700 disabled:cursor-not-allowed transition-all duration-200 w-full focus:outline-none focus:ring-1 focus:ring-gray-500"
             >
               {loading ? (
-                <span className="flex items-center gap-2">
+                <span className="flex items-center justify-center gap-2">
                   <LoadingIcon />
                   Loading...
                 </span>
@@ -238,12 +238,12 @@ export default function GetLastTXFromAddress() {
             </button>
             {votes.length > 0 && (
               <button
-                className="px-6 py-3 bg-blue-700 text-white font-medium disabled:bg-gray-600 cursor-pointer rounded-lg disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:bg-opacity-60 hover:shadow-md w-full"
+                className="px-6 py-3 bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600 font-medium rounded-md disabled:bg-gray-800 disabled:text-gray-500 disabled:border-gray-700 disabled:cursor-not-allowed transition-all duration-200 w-full focus:outline-none focus:ring-1 focus:ring-gray-500"
                 onClick={handleCopy}
                 disabled={isSendingTx || !txHash || !signer}
               >
                 {isSendingTx ? (
-                  <span className="flex items-center gap-2">
+                  <span className="flex items-center justify-center gap-2">
                     <LoadingIcon />
                     Sending Tx...
                   </span>
@@ -259,7 +259,7 @@ export default function GetLastTXFromAddress() {
       </div>
 
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+        <div className="p-4 bg-red-900 border border-red-700 rounded-md text-red-300">
           <div className="flex items-center gap-2">
             <svg
               className="h-5 w-5"
@@ -281,15 +281,15 @@ export default function GetLastTXFromAddress() {
 
       {loading && !error && !isSendingTx && (
         <div className="text-center py-12">
-          <div className="inline-block w-12 h-12 border-4 border-gray-200 border-t-green-500 rounded-full animate-spin"></div>
-          <p className="mt-4 text-gray-600">Loading vote information...</p>
+          <div className="inline-block w-12 h-12 border-4 border-gray-600 border-t-gray-300 rounded-full animate-spin"></div>
+          <p className="mt-4 text-gray-400">Loading vote information...</p>
         </div>
       )}
 
       {isSendingTx && (
         <div className="text-center py-12">
-          <div className="inline-block w-12 h-12 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin"></div>
-          <p className="mt-4 text-gray-600">
+          <div className="inline-block w-12 h-12 border-4 border-gray-600 border-t-gray-300 rounded-full animate-spin"></div>
+          <p className="mt-4 text-gray-400">
             Sending transaction, please check your wallet...
           </p>
         </div>
@@ -302,18 +302,18 @@ export default function GetLastTXFromAddress() {
             onClick={() => {
               navigator.clipboard.writeText(txHash);
             }}
-            className="font-mono cursor-pointer bg-gray-600 p-2 px-4 rounded-md"
+            className="font-mono cursor-pointer bg-gray-800 p-2 px-4 rounded-md text-gray-300 hover:bg-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-500"
           >
             {txHash}
           </p>
           <a href={`https://etherscan.io/tx/${txHash}`} target="_blank">
-            <LinkIcon className="w-6 h-6" />
+            <LinkIcon className="w-6 h-6 text-gray-400 hover:text-gray-300" />
           </a>
         </div>
       )}
 
       {sentTxHash && (
-        <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
+        <div className="mt-4 p-4 bg-green-900 border border-green-700 rounded-md text-green-300">
           <div className="flex items-center gap-2">
             <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
               <path
@@ -327,7 +327,7 @@ export default function GetLastTXFromAddress() {
               href={`https://etherscan.io/tx/${sentTxHash}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-mono underline hover:text-green-900"
+              className="font-mono underline hover:text-green-500"
             >
               {sentTxHash.substring(0, 10)}...
             </a>
@@ -336,45 +336,45 @@ export default function GetLastTXFromAddress() {
       )}
 
       {votes.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <div className="overflow-hidden rounded-md border border-gray-700 bg-gray-800 text-gray-300">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-gray-50">
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                <tr className="bg-gray-700">
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">
                     Name
                   </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">
                     Address
                   </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">
                     Expiry
                   </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">
                     Weight
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-700">
                 {votes.map((vote, index) => (
                   <tr
                     key={index}
-                    className="hover:bg-gray-50 transition-colors duration-150"
+                    className="hover:bg-gray-600 transition-colors duration-150"
                   >
-                    <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+                    <td className="px-6 py-4 text-sm text-gray-300 whitespace-nowrap">
                       {vote.name}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 font-mono">
+                    <td className="px-6 py-4 text-sm text-gray-300 font-mono">
                       {vote.address}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
+                    <td className="px-6 py-4 text-sm text-gray-300">
                       {new Date(vote.expiry).toLocaleDateString("en-US", {
                         year: "numeric",
                         month: "long",
                         day: "numeric",
                       })}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 font-medium">
+                    <td className="px-6 py-4 text-sm text-gray-300 font-medium">
                       {((Number(vote.weight) / 1e18) * 100).toFixed(2)}%
                     </td>
                   </tr>

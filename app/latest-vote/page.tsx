@@ -1,19 +1,12 @@
 "use client";
 
 import { Card, CardContent, Input, Button, Alert } from "@/components/ui";
-import { ethers } from "ethers";
-import { ExternalLink, Wallet, Search, Copy, Check, Send } from "lucide-react";
+import { VoteResults, WalletButton, CopyVoteButton, Vote } from "@/components/vote";
+import { useVoteCopy } from "@/hooks/useVoteCopy";
+import { ExternalLink, Search } from "lucide-react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
-
-interface Vote {
-  name: string;
-  address: string;
-  expiry: string;
-  weight: string;
-}
-
-const VOTING_CONTRACT_ADDRESS = "0x44087E105137a5095c008AaB6a6530182821F2F0";
 
 function LatestVoteClientContent() {
   const searchParams = useSearchParams();
@@ -22,22 +15,28 @@ function LatestVoteClientContent() {
   const [loading, setLoading] = useState(false);
   const [votes, setVotes] = useState<Vote[]>([]);
   const [txHash, setTxHash] = useState("");
-  const [error, setError] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [fetchError, setFetchError] = useState("");
 
-  const [signer, setSigner] = useState<ethers.Signer | null>(null);
-  const [connectedAddress, setConnectedAddress] = useState<string | null>(null);
-  const [sentTxHash, setSentTxHash] = useState<string | null>(null);
-  const [isSendingTx, setIsSendingTx] = useState(false);
+  const {
+    connectedAddress,
+    sentTxHash,
+    isSendingTx,
+    error: walletError,
+    connectWallet,
+    copyAndSendVote,
+    clearError,
+    signer,
+  } = useVoteCopy();
 
   const handleSubmitHash = async (hash: string = txHash) => {
     if (!hash) {
-      setError("Please enter a transaction hash");
+      setFetchError("Please enter a transaction hash");
       return;
     }
 
     setLoading(true);
-    setError("");
+    setFetchError("");
+    clearError();
     try {
       const response = await fetch(`/api/get-vote-transaction?txHash=${hash}`);
       if (!response.ok) {
@@ -46,7 +45,7 @@ function LatestVoteClientContent() {
       const data = await response.json();
       setVotes(data);
     } catch (error) {
-      setError(
+      setFetchError(
         error instanceof Error ? error.message : "Failed to fetch vote info"
       );
     } finally {
@@ -64,45 +63,15 @@ function LatestVoteClientContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  const connectWallet = async () => {
-    setError("");
-    setSigner(null);
-    setConnectedAddress(null);
-    if (typeof (window as any).ethereum !== "undefined") {
-      try {
-        await (window as any).ethereum.request({
-          method: "eth_requestAccounts",
-        });
-        const provider = new ethers.BrowserProvider((window as any).ethereum);
-
-        const network = await provider.getNetwork();
-        if (network.chainId !== BigInt(1)) {
-          setError("Please switch to Ethereum Mainnet in your wallet.");
-          return;
-        }
-
-        const walletSigner = await provider.getSigner();
-        setSigner(walletSigner);
-        setConnectedAddress(await walletSigner.getAddress());
-      } catch (e) {
-        console.error("Wallet connection error:", e);
-        setError(e instanceof Error ? e.message : "Failed to connect wallet.");
-        setSigner(null);
-        setConnectedAddress(null);
-      }
-    } else {
-      setError("MetaMask is not installed. Please install it to continue.");
-    }
-  };
-
   const handleSubmit = async () => {
     if (!address) {
-      setError("Please enter a valid address");
+      setFetchError("Please enter a valid address");
       return;
     }
 
     setLoading(true);
-    setError("");
+    setFetchError("");
+    clearError();
     try {
       const response = await fetch(
         `/api/get-latest-vote-tx-from-address?address=${address}`
@@ -114,7 +83,7 @@ function LatestVoteClientContent() {
       setVotes(data.decoded);
       setTxHash(data.hash);
     } catch (error) {
-      setError(
+      setFetchError(
         error instanceof Error ? error.message : "Failed to fetch vote info"
       );
     } finally {
@@ -122,90 +91,11 @@ function LatestVoteClientContent() {
     }
   };
 
-  const handleCopy = async () => {
-    if (!signer) {
-      setError("Please connect your wallet first.");
-      return;
-    }
-
-    try {
-      const network = await signer.provider?.getNetwork();
-      if (network?.chainId !== BigInt(1)) {
-        setError(
-          "Please switch to Ethereum Mainnet in your wallet to send the transaction."
-        );
-        setIsSendingTx(false);
-        return;
-      }
-    } catch (e) {
-      console.error("Error getting network information:", e);
-      setError(
-        "Could not verify network. Please ensure your wallet is connected to Ethereum Mainnet."
-      );
-      setIsSendingTx(false);
-      return;
-    }
-
-    if (!txHash) {
-      setError(
-        "You need to have fetched a transaction hash to copy its vote data."
-      );
-      return;
-    }
-
-    setIsSendingTx(true);
-    setError("");
-    setSentTxHash(null);
-    try {
-      const response = await fetch("/api/copy-vote", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ hash: txHash, address: connectedAddress }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error || "Failed to get encoded vote data from API."
-        );
-      }
-
-      if (!data.encodedData) {
-        throw new Error("API did not return encodedData.");
-      }
-
-      const transactionParameters = {
-        to: VOTING_CONTRACT_ADDRESS,
-        data: data.encodedData,
-      };
-
-      const txResponse = await signer.sendTransaction(transactionParameters);
-      setSentTxHash(txResponse.hash);
-      await txResponse.wait();
-    } catch (e) {
-      console.error("Failed to copy and send vote transaction:", e);
-      setError(
-        e instanceof Error ? e.message : "Failed to send vote transaction."
-      );
-      setSentTxHash(null);
-    } finally {
-      setIsSendingTx(false);
-    }
+  const handleCopyVote = () => {
+    copyAndSendVote(txHash);
   };
 
-  const handleCopyHash = async () => {
-    await navigator.clipboard.writeText(txHash);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const totalWeight = votes.reduce(
-    (sum, vote) => sum + Number(vote.weight) / 1e18,
-    0
-  );
+  const error = fetchError || walletError;
 
   return (
     <div className="min-h-screen bg-neutral-950">
@@ -213,27 +103,18 @@ function LatestVoteClientContent() {
       <header className="border-b border-neutral-800">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <nav className="flex items-center gap-2 text-sm text-neutral-500">
-            <a href="/" className="hover:text-neutral-300 transition-colors">
+            <Link href="/" className="hover:text-neutral-300 transition-colors">
               Home
-            </a>
+            </Link>
             <span>/</span>
             <span className="text-neutral-300">Latest Vote</span>
           </nav>
 
           {/* Wallet Connection */}
-          {!connectedAddress ? (
-            <Button variant="outline" size="sm" onClick={connectWallet}>
-              <Wallet className="w-4 h-4 mr-2" />
-              Connect Wallet
-            </Button>
-          ) : (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800">
-              <div className="w-2 h-2 rounded-full bg-green-500" />
-              <span className="text-sm text-neutral-300 font-mono">
-                {connectedAddress.slice(0, 6)}...{connectedAddress.slice(-4)}
-              </span>
-            </div>
-          )}
+          <WalletButton
+            connectedAddress={connectedAddress}
+            onConnect={connectWallet}
+          />
         </div>
       </header>
 
@@ -276,19 +157,12 @@ function LatestVoteClientContent() {
 
               {votes.length > 0 && (
                 <div className="pt-3 border-t border-neutral-800">
-                  <Button
-                    variant="secondary"
-                    onClick={handleCopy}
+                  <CopyVoteButton
+                    onCopy={handleCopyVote}
                     disabled={isSendingTx || !txHash || !signer}
                     loading={isSendingTx}
-                    loadingText="Sending..."
-                    className="w-full"
-                  >
-                    <Send className="w-4 h-4 mr-2" />
-                    {signer
-                      ? "Copy & Send Vote Transaction"
-                      : "Connect wallet to copy transaction"}
-                  </Button>
+                    hasWallet={!!signer}
+                  />
                 </div>
               )}
             </div>
@@ -340,122 +214,7 @@ function LatestVoteClientContent() {
 
         {/* Results */}
         {!loading && !isSendingTx && votes.length > 0 && (
-          <div className="space-y-6">
-            {/* Transaction Info */}
-            <Card>
-              <CardContent className="py-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-sm text-neutral-500 flex-shrink-0">
-                      Transaction:
-                    </span>
-                    <code className="text-sm text-neutral-300 font-mono truncate">
-                      {txHash}
-                    </code>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <button
-                      onClick={handleCopyHash}
-                      className="p-2 rounded-md hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition-colors"
-                      title="Copy hash"
-                    >
-                      {copied ? (
-                        <Check className="w-4 h-4 text-green-400" />
-                      ) : (
-                        <Copy className="w-4 h-4" />
-                      )}
-                    </button>
-                    <a
-                      href={`https://etherscan.io/tx/${txHash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 rounded-md hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition-colors"
-                      title="View on Etherscan"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Stats */}
-            <div className="grid grid-cols-2 gap-4">
-              <Card>
-                <CardContent className="text-center py-6">
-                  <p className="text-3xl font-semibold text-neutral-100">
-                    {votes.length}
-                  </p>
-                  <p className="text-sm text-neutral-500 mt-1">Total Pools</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="text-center py-6">
-                  <p className="text-3xl font-semibold text-neutral-100">
-                    {(totalWeight * 100).toFixed(2)}%
-                  </p>
-                  <p className="text-sm text-neutral-500 mt-1">Total Weight</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Vote Table */}
-            <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-neutral-800 bg-neutral-900/50">
-                      <th className="px-6 py-4 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                        Pool
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                        Address
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                        Expiry
-                      </th>
-                      <th className="px-6 py-4 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                        Weight
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-800">
-                    {votes.map((vote, index) => (
-                      <tr
-                        key={index}
-                        className="hover:bg-neutral-800/50 transition-colors"
-                      >
-                        <td className="px-6 py-4">
-                          <span className="text-sm font-medium text-neutral-200">
-                            {vote.name}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <code className="text-xs text-neutral-400 font-mono">
-                            {vote.address.slice(0, 6)}...{vote.address.slice(-4)}
-                          </code>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-sm text-neutral-400">
-                            {new Date(vote.expiry).toLocaleDateString("en-US", {
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                            })}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <span className="text-sm font-medium text-neutral-200">
-                            {((Number(vote.weight) / 1e18) * 100).toFixed(2)}%
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          </div>
+          <VoteResults votes={votes} txHash={txHash} />
         )}
 
         {/* Empty State */}
